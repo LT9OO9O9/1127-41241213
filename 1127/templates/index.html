@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>會員註冊與登入</title>
+  <!-- Firebase SDK -->
+  <script type="module">
+    // Import Firebase 模組
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+    import { getDatabase, ref, set, get, update } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-database.js";
+
+    // Firebase 設定
+    const firebaseConfig = {
+      apiKey: "AIzaSyCjOcU4Xis2Sq8Jibb-0p_g6NGSitNmB-c",
+      authDomain: "project41241213-1126.firebaseapp.com",
+      databaseURL: "https://project41241213-1126-default-rtdb.asia-southeast1.firebasedatabase.app",
+      projectId: "project41241213-1126",
+      storageBucket: "project41241213-1126.firebasestorage.app",
+      messagingSenderId: "691962017275",
+      appId: "1:691962017275:web:241f9cac75f3cb14dc875e",
+      measurementId: "G-CRKXMV6NEH"
+    };
+
+    // 初始化 Firebase
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const database = getDatabase(app);
+
+    // 註冊按鈕
+    document.getElementById("registerBtn").addEventListener("click", registerUser);
+
+    // 登入按鈕
+    document.getElementById("actionBtn").addEventListener("click", loginUser);
+
+    //檢查使用者是否已登入並更新介面
+    auth.onAuthStateChanged((user) => {
+      if (user) {
+        updateUI(true, user);
+      } else {
+        updateUI(false);
+      }
+    });
+
+    function registerUser() {
+      const provider = new GoogleAuthProvider();
+      signInWithPopup(auth, provider)
+        .then((result) => {
+          const user = result.user;
+
+          // 檢查是否已註冊
+          const userRef = ref(database, 'users/' + user.uid);
+          get(userRef).then((snapshot) => {
+            if (snapshot.exists()) {
+              alert("此帳戶已註冊！");
+              updateUI(true, user);
+            } else {
+              const userData = {
+                name: user.displayName,
+                email: user.email,
+                photoURL: user.photoURL,
+                registerTime: new Date().toISOString(),
+                lastLogin: new Date().toISOString()
+              };
+              set(userRef, userData);
+              alert("註冊成功！");
+              updateUI(true, user);
+            }
+          });
+        })
+        .catch((error) => {
+          console.error("註冊錯誤:", error);
+        });
+    }
+
+
+    function updateUI(isLoggedIn, user = null) {
+      const actionBtn = document.getElementById("actionBtn");
+      const registerBtn = document.getElementById("registerBtn");
+      const userInfo = document.getElementById("userInfo");
+
+      if (isLoggedIn) {
+        // 已登入
+        actionBtn.textContent = "登出";
+        actionBtn.onclick = signOutUser;
+
+        registerBtn.textContent = "顯示資料";
+        registerBtn.onclick = () => {
+          if (user) {
+            document.getElementById("userName").textContent = `名稱: ${user.displayName}`;
+            document.getElementById("userEmail").textContent = `電子郵件: ${user.email}`;
+            document.getElementById("userPhoto").src = user.photoURL;
+            document.getElementById("lastLogin").textContent = `最後登入: ${new Date().toISOString()}`;
+            userInfo.style.display = "block";
+          }
+        };
+      } else {
+        // 未登入
+        actionBtn.textContent = "登入";
+        actionBtn.onclick = loginUser;
+
+        registerBtn.textContent = "註冊";
+        registerBtn.onclick = registerUser;
+
+        userInfo.style.display = "none";
+      }
+    }
+
+
+    // 登入功能
+    function loginUser() {
+      const provider = new GoogleAuthProvider();
+      signInWithPopup(auth, provider)
+        .then((result) => {
+          const user = result.user;
+
+          // 更新最後登入時間
+          const lastLoginTime = new Date().toISOString();
+          const userRef = ref(database, 'users/' + user.uid);
+
+          get(userRef).then((snapshot) => {
+            if (snapshot.exists()) {
+              update(userRef, { lastLogin: lastLoginTime });
+              updateUI(true, user);
+            } else {
+              alert("此帳戶尚未註冊！");
+            }
+          });
+        })
+        .catch((error) => {
+          console.error("登入錯誤:", error);
+        });
+    }
+
+
+    // 登出功能
+    function signOutUser() {
+      signOut(auth).then(() => {
+        alert("已成功登出！");
+        updateUI(false);
+      }).catch((error) => {
+        console.error("登出錯誤:", error);
+      });
+    }
+
+    window.signOutUser = signOutUser;
+  </script>
+
+</head>
+<body>
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+    const auth = firebase.auth();
+    const database = firebase.database();
+    const provider = new firebase.auth.GoogleAuthProvider();
+
+    let currentUserId = null;
+
+    // 按鈕元素
+    const registerBtn = document.getElementById('registerBtn');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const showUserInfoBtn = document.getElementById('showUserInfoBtn');
+    const crudSection = document.getElementById('crudSection');
+
+    // 註冊用戶
+    registerBtn.addEventListener('click', () => {
+        auth.signInWithPopup(provider)
+            .then(result => {
+                saveUserData(result.user);
+                showAlert('success', '註冊成功！');
+            })
+            .catch(error => {
+                showAlert('error', '註冊失敗', error.message);
+            });
+    });
+
+    // 登入用戶
+    loginBtn.addEventListener('click', () => {
+        auth.signInWithPopup(provider)
+            .then(result => {
+                checkIfUserExists(result.user);
+                showAlert('success', '登入成功！');
+            })
+            .catch(error => {
+                showAlert('error', '登入失敗', error.message);
+            });
+    });
+
+    // 登出用戶
+    logoutBtn.addEventListener('click', () => {
+        showConfirm('確定登出？', '', () => {
+            auth.signOut()
+                .then(() => {
+                    resetUI();
+                    showAlert('success', '登出成功！');
+                })
+                .catch(error => {
+                    showAlert('error', '登出失敗', error.message);
+                });
+        });
+    });
+
+    // 顯示用戶信息
+    showUserInfoBtn.addEventListener('click', () => {
+        const userInfoModal = new bootstrap.Modal(document.getElementById('userInfoModal'));
+        userInfoModal.show();
+    });
+
+    // 保存用戶數據到 Firebase Database
+    function saveUserData(user) {
+        const userData = {
+            name: user.displayName,
+            email: user.email,
+            photoURL: user.photoURL,
+            lastLogin: new Date().toISOString()
+        };
+
+        database.ref('users/' + user.uid).set(userData)
+            .then(() => {
+                currentUserId = user.uid;
+                displayUserData(userData);
+                loadNotes();
+            })
+            .catch(error => {
+                console.error('保存用戶資料失敗：', error);
+            });
+    }
+
+    // 檢查用戶是否存在
+    function checkIfUserExists(user) {
+        database.ref('users/' + user.uid).once('value')
+            .then(snapshot => {
+                if (snapshot.exists()) {
+                    const userData = snapshot.val();
+                    currentUserId = user.uid;
+                    displayUserData(userData);
+                    loadNotes();
+                } else {
+                    saveUserData(user);
+                }
+            })
+            .catch(error => {
+                console.error('檢查用戶失敗：', error);
+            });
+    }
+
+    // 顯示用戶資料
+    function displayUserData(userData) {
+        // 更新模態框內資料
+        document.getElementById('modalUserPhoto').src = userData.photoURL;
+        document.getElementById('modalUserName').textContent = `姓名：${userData.name}`;
+        document.getElementById('modalUserEmail').textContent = `Email：${userData.email}`;
+        document.getElementById('modalLastLogin').textContent = `最後登入時間：${userData.lastLogin}`;
+
+        // 顯示登入後的按鈕
+        showUserInfoBtn.classList.remove('d-none');
+        logoutBtn.classList.remove('d-none');
+
+        // 隱藏登入/註冊按鈕
+        loginBtn.classList.add('d-none');
+        registerBtn.classList.add('d-none');
+
+        // 顯示 CRUD 功能
+        crudSection.classList.remove('d-none');
+    }
+
+    // 重置 UI
+    function resetUI() {
+        // 隱藏登入後的按鈕
+        showUserInfoBtn.classList.add('d-none');
+        logoutBtn.classList.add('d-none');
+        crudSection.classList.add('d-none');
+
+        // 顯示登入/註冊按鈕
+        loginBtn.classList.remove('d-none');
+        registerBtn.classList.remove('d-none');
+    }
+
+    // SweetAlert2 通用彈窗
+    const showAlert = (icon, title, text = '') => {
+        Swal.fire({ icon, title, text });
+    };
+
+    const showConfirm = (title, text, confirmCallback) => {
+        Swal.fire({
+            title,
+            text,
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: '確認',
+            cancelButtonText: '取消'
+        }).then(result => {
+            if (result.isConfirmed) {
+                confirmCallback();
+            }
+        });
+    };
+});
+  </script>
+  
+  <div class="container mt-5">
+      <h1 class="text-center">會員系統</h1>
+      <div class="text-center my-4">
+          <!-- 按鈕狀態切換 -->
+          <button id="registerBtn" class="btn btn-primary d-none">註冊</button>
+          <button id="loginBtn" class="btn btn-success d-none">登入</button>
+          <button id="showUserInfoBtn" class="btn btn-info d-none">會員信息</button>
+          <button id="logoutBtn" class="btn btn-danger d-none">登出</button>
+      </div>
+
+      <!-- CRUD 功能區 -->
+      <div id="crudSection" class="mt-5 d-none">
+          <h3>筆記管理</h3>
+          <div class="mb-3">
+              <input id="noteTitle" type="text" class="form-control mb-2" placeholder="標題">
+              <textarea id="noteContent" class="form-control mb-2" placeholder="內容"></textarea>
+              <button id="createNoteBtn" class="btn btn-primary">新增筆記</button>
+          </div>
+          <h4>筆記列表</h4>
+          <ul id="notesList" class="list-group"></ul>
+      </div>
+
+      <!-- 模態框：顯示會員信息 -->
+      <div class="modal fade" id="userInfoModal" tabindex="-1" aria-labelledby="userInfoModalLabel" aria-hidden="true">
+          <div class="modal-dialog">
+              <div class="modal-content">
+                  <div class="modal-header">
+                      <h5 class="modal-title" id="userInfoModalLabel">會員信息</h5>
+                      <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                  </div>
+                  <div class="modal-body text-center">
+                      <img id="modalUserPhoto" class="img-fluid rounded-circle mb-3" alt="用戶頭像" style="width: 100px;">
+                      <h5 id="modalUserName"></h5>
+                      <p id="modalUserEmail"></p>
+                      <p id="modalLastLogin" class="text-muted"></p>
+                  </div>
+                  <div class="modal-footer">
+                      <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+                  </div>
+              </div>
+          </div>
+      </div>
+  </div>
+</body>
+</html>
+
+<!-- <body>
+  <h1>會員註冊與登入</h1>
+  <button id="actionBtn">登入</button>
+  <button id="registerBtn">註冊</button>
+  <div id="userInfo" style="display: none;">
+    <h2>使用者資訊</h2>
+    <img id="userPhoto" alt="使用者照片" width="100" style="border-radius: 50%;">
+    <p id="userName"></p>
+    <p id="userEmail"></p>
+    <p id="lastLogin"></p>
+    <button onclick="signOutUser()">登出</button>
+  </div>
+</body>
+</html> -->
